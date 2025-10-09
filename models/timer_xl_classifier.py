@@ -39,6 +39,7 @@ class Model(nn.Module):
         super().__init__()
         
         self.input_token_len = configs.input_token_len
+        self.output_token_len = configs.output_token_len
         self.output_attention = configs.output_attention
         self.use_norm = configs.use_norm
         self.n_classes = getattr(configs, 'n_classes', 2)  # Binary classification
