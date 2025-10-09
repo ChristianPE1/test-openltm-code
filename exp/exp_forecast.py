@@ -106,6 +106,11 @@ class Exp_Forecast(Exp_Basic):
         test_steps = len(vali_loader)
         iter_count = 0
         
+        # For classification: track accuracy
+        if self.args.task_name == 'classification':
+            correct = 0
+            total = 0
+        
         self.model.eval()    
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
@@ -148,6 +153,12 @@ class Exp_Forecast(Exp_Basic):
                 
                 loss = criterion(outputs, batch_y)
 
+                # For classification: calculate accuracy
+                if self.args.task_name == 'classification':
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += batch_y.size(0)
+                    correct += (predicted == batch_y).sum().item()
+
                 loss = loss.detach().cpu()
                 total_loss.append(loss)
                 total_count.append(batch_x.shape[0])
@@ -165,6 +176,11 @@ class Exp_Forecast(Exp_Basic):
             total_loss = total_loss.item() / dist.get_world_size()
         else:
             total_loss = np.average(total_loss, weights=total_count)
+        
+        # For classification: print accuracy
+        if self.args.task_name == 'classification':
+            accuracy = 100 * correct / total if total > 0 else 0
+            print(f"   Accuracy: {accuracy:.2f}% ({correct}/{total})")
             
         if self.args.model == 'gpt4ts':
             # GPT4TS just requires to train partial layers
@@ -230,9 +246,25 @@ class Exp_Forecast(Exp_Basic):
                             batch_y = batch_y[:, :, -1]
                 
                 loss = criterion(outputs, batch_y)
+                
+                # Check for NaN loss
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"⚠️ NaN/Inf loss detected at iter {i+1}!")
+                    print(f"   outputs min/max: {outputs.min().item():.4f}/{outputs.max().item():.4f}")
+                    print(f"   batch_y min/max: {batch_y.min().item():.4f}/{batch_y.max().item():.4f}")
+                    # Skip this batch
+                    continue
+                
                 if (i + 1) % 100 == 0:
                     if (self.args.ddp and self.args.local_rank == 0) or not self.args.ddp:
-                        print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
+                        # For classification: show accuracy
+                        if self.args.task_name == 'classification':
+                            _, predicted = torch.max(outputs.data, 1)
+                            train_acc = (predicted == batch_y).sum().item() / batch_y.size(0) * 100
+                            print("\titers: {0}, epoch: {1} | loss: {2:.7f} | acc: {3:.2f}%".format(
+                                i + 1, epoch + 1, loss.item(), train_acc))
+                        else:
+                            print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
                         speed = (time.time() - time_now) / iter_count
                         left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
                         print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
