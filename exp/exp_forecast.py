@@ -39,7 +39,9 @@ class Exp_Forecast(Exp_Basic):
             
         if self.args.adaptation:
             # Load pre-trained weights (only compatible layers)
-            pretrained_dict = torch.load(self.args.pretrain_model_path, map_location=self.device)
+            # Ensure device is a torch.device object for map_location
+            device_for_load = torch.device(f'cuda:{self.device}') if isinstance(self.device, int) else self.device
+            pretrained_dict = torch.load(self.args.pretrain_model_path, map_location=device_for_load)
             model_dict = model.state_dict()
             
             # Filter out incompatible keys (e.g., classifier layers not in pretrained)
