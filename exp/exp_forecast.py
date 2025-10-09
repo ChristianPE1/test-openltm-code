@@ -38,7 +38,28 @@ class Exp_Forecast(Exp_Basic):
             model = model.to(self.device)
             
         if self.args.adaptation:
-            model.load_state_dict(torch.load(self.args.pretrain_model_path))
+            # Load pre-trained weights (only compatible layers)
+            pretrained_dict = torch.load(self.args.pretrain_model_path, map_location=self.device)
+            model_dict = model.state_dict()
+            
+            # Filter out incompatible keys (e.g., classifier layers not in pretrained)
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
+            
+            # Count loaded vs skipped parameters
+            loaded_keys = set(pretrained_dict.keys())
+            model_keys = set(model_dict.keys())
+            skipped_keys = model_keys - loaded_keys
+            
+            # Update model dict with pretrained weights
+            model_dict.update(pretrained_dict)
+            model.load_state_dict(model_dict)
+            
+            if (self.args.ddp and self.args.local_rank == 0) or not self.args.ddp:
+                print(f"✅ Loaded {len(loaded_keys)} pre-trained parameters")
+                print(f"🆕 Initialized {len(skipped_keys)} new parameters (will be trained from scratch)")
+                if len(skipped_keys) > 0 and len(skipped_keys) < 20:
+                    print(f"   New parameters: {sorted(skipped_keys)}")
+        
         return model
 
     def _get_data(self, flag):
