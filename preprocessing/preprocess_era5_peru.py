@@ -83,14 +83,22 @@ class ERA5PreprocessorPeru:
     
     def extract_zip_files(self, years):
         """
-        Extract .zip files for specified years
+        Extract .zip files for specified years OR use .nc files directly
         Maneja archivos CDS que contienen múltiples .nc (accum + instant)
+        O archivos .nc ya combinados/extraídos
         """
-        print("\n[1/6] Extracting ZIP files...")
+        print("\n[1/6] Locating data files...")
         
         extracted_files = []
         for year in years:
-            # Intentar ambos formatos de nombre
+            # Primero buscar archivos .nc directos (ya combinados)
+            nc_direct = self.input_dir / f"era5_peru_{year}.nc"
+            if nc_direct.exists():
+                print(f"  ✅ Found .nc file: {nc_direct.name}")
+                extracted_files.append(nc_direct)
+                continue
+            
+            # Si no hay .nc, buscar .zip para extraer
             possible_names = [
                 f"era5_peru_{year}.zip",  # Formato esperado
                 f"cds_{year}.zip"          # Formato CDS original
