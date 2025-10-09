@@ -205,18 +205,20 @@ class Model(nn.Module):
         dec_out = self.head(embed_out)
         
         # ========== CLASSIFICATION ==========
-        # For classification, we don't need to denormalize or reshape to time series
-        # Work directly with the encoder output embeddings
+        # For classification, pool over the variable dimension
+        # dec_out shape: [B, C * N, output_token_len]
         
-        # Reshape: [B, C * N, output_token_len] -> [B, C, N * output_token_len]
-        dec_out = dec_out.reshape(B, C, N * self.output_token_len)
+        # Reshape to separate variables: [B, C * N, output_token_len] -> [B, C, N, output_token_len]
+        dec_out = dec_out.reshape(B, C, N, self.output_token_len)
         
-        # Pool over time tokens: [B, C, N * output_token_len] -> [B, C]
-        # Use mean pooling to aggregate temporal information
-        dec_out_pooled = dec_out.mean(dim=2)
+        # Pool over variables (C): [B, C, N, output_token_len] -> [B, N, output_token_len]
+        dec_out_pooled = dec_out.mean(dim=1)
         
-        # Classify: [B, C] -> [B, n_classes]
-        logits = self.classifier(dec_out_pooled)
+        # Flatten temporal features: [B, N, output_token_len] -> [B, N * output_token_len]
+        dec_out_flat = dec_out_pooled.reshape(B, N * self.output_token_len)
+        
+        # Classify: [B, N * output_token_len] -> [B, n_classes]
+        logits = self.classifier(dec_out_flat)
         
         if self.output_attention:
             return logits, attns
