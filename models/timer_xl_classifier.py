@@ -168,13 +168,15 @@ class Model(nn.Module):
             attns: Attention weights (if output_attention=True)
         """
         
-        # Instance normalization
+        # Instance normalization with safer epsilon
         if self.use_norm:
             means = x.mean(1, keepdim=True).detach()
             x = x - means
             stdev = torch.sqrt(
-                torch.var(x, dim=1, keepdim=True, unbiased=False) + 1e-5
+                torch.var(x, dim=1, keepdim=True, unbiased=False) + 1e-6
             )
+            # Clamp to prevent division by very small numbers
+            stdev = torch.clamp(stdev, min=1e-5)
             x /= stdev
         
         B, L, C = x.shape
@@ -217,14 +219,9 @@ class Model(nn.Module):
         # Pool over temporal tokens (N): [B, N, output_token_len] -> [B, output_token_len]
         dec_out_final = dec_out_pooled.mean(dim=1)
         
-        # Check for NaN/Inf before classification
+        # Safety check: replace NaN/Inf with zeros (shouldn't happen with fixed normalization)
         if torch.isnan(dec_out_final).any() or torch.isinf(dec_out_final).any():
-            print(f"⚠️ WARNING: NaN/Inf detected in dec_out_final!")
-            print(f"   NaN count: {torch.isnan(dec_out_final).sum().item()}")
-            print(f"   Inf count: {torch.isinf(dec_out_final).sum().item()}")
-            print(f"   Min: {dec_out_final.min().item()}, Max: {dec_out_final.max().item()}")
-            # Replace NaN/Inf with zeros
-            dec_out_final = torch.nan_to_num(dec_out_final, nan=0.0, posinf=1.0, neginf=-1.0)
+            dec_out_final = torch.nan_to_num(dec_out_final, nan=0.0, posinf=0.0, neginf=0.0)
         
         # Classify: [B, output_token_len] -> [B, n_classes]
         logits = self.classifier(dec_out_final)

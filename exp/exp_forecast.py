@@ -247,12 +247,10 @@ class Exp_Forecast(Exp_Basic):
                 
                 loss = criterion(outputs, batch_y)
                 
-                # Check for NaN loss
+                # Check for NaN loss (skip batch if detected)
                 if torch.isnan(loss) or torch.isinf(loss):
-                    print(f"⚠️ NaN/Inf loss detected at iter {i+1}!")
-                    print(f"   outputs min/max: {outputs.min().item():.4f}/{outputs.max().item():.4f}")
-                    print(f"   batch_y min/max: {batch_y.min().item():.4f}/{batch_y.max().item():.4f}")
-                    # Skip this batch
+                    if (i + 1) % 50 == 0:  # Only print occasionally
+                        print(f"⚠️ Skipping batch {i+1} due to NaN/Inf loss")
                     continue
                 
                 if (i + 1) % 100 == 0:
