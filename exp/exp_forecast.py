@@ -111,7 +111,14 @@ class Exp_Forecast(Exp_Basic):
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float()
+                
+                # For classification, keep batch_y as long (class indices)
+                # For regression, convert to float
+                if self.args.task_name == 'classification':
+                    batch_y = batch_y.long()
+                else:
+                    batch_y = batch_y.float()
+                
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
                 
@@ -186,7 +193,14 @@ class Exp_Forecast(Exp_Basic):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float().to(self.device)
+                
+                # For classification, keep batch_y as long (class indices)
+                # For regression, convert to float
+                if self.args.task_name == 'classification':
+                    batch_y = batch_y.long().to(self.device)
+                else:
+                    batch_y = batch_y.float().to(self.device)
+                
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
