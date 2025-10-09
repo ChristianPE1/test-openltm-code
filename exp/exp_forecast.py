@@ -123,20 +123,29 @@ class Exp_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
                 
                 outputs = self.model(batch_x, batch_x_mark, batch_y_mark)
-                if is_test or self.args.nonautoregressive:
+                
+                # For classification, outputs are [B, n_classes], batch_y is [B]
+                # For regression, outputs are [B, seq, features]
+                if self.args.task_name == 'classification':
+                    # Classification: outputs already [B, n_classes], batch_y already [B]
+                    batch_y = batch_y.to(self.device)
+                else:
+                    # Regression: need to slice outputs and batch_y
+                    if is_test or self.args.nonautoregressive:
                         outputs = outputs[:, -self.args.output_token_len:, :]
                         batch_y = batch_y[:, -self.args.output_token_len:, :].to(self.device)
-                else:
-                    outputs = outputs[:, :, :]
-                    batch_y = batch_y[:, :, :].to(self.device)
-
-                if self.args.covariate:
-                    if self.args.last_token:
-                        outputs = outputs[:, -self.args.output_token_len:, -1]
-                        batch_y = batch_y[:, -self.args.output_token_len:, -1]
                     else:
-                        outputs = outputs[:, :, -1]
-                        batch_y = batch_y[:, :, -1]
+                        outputs = outputs[:, :, :]
+                        batch_y = batch_y[:, :, :].to(self.device)
+
+                    if self.args.covariate:
+                        if self.args.last_token:
+                            outputs = outputs[:, -self.args.output_token_len:, -1]
+                            batch_y = batch_y[:, -self.args.output_token_len:, -1]
+                        else:
+                            outputs = outputs[:, :, -1]
+                            batch_y = batch_y[:, :, -1]
+                
                 loss = criterion(outputs, batch_y)
 
                 loss = loss.detach().cpu()
@@ -207,15 +216,19 @@ class Exp_Forecast(Exp_Basic):
                 outputs = self.model(batch_x, batch_x_mark, batch_y_mark)
                 if self.args.dp:
                     torch.cuda.synchronize()
-                if self.args.nonautoregressive:
-                    batch_y = batch_y[:, -self.args.output_token_len:, :]
-                if self.args.covariate:
-                    if self.args.last_token:
-                        outputs = outputs[:, -self.args.output_token_len:, -1]
-                        batch_y = batch_y[:, -self.args.output_token_len:, -1]
-                    else:
-                        outputs = outputs[:, :, -1]
-                        batch_y = batch_y[:, :, -1]
+                
+                # For classification, skip reshaping (outputs already [B, n_classes])
+                if self.args.task_name != 'classification':
+                    if self.args.nonautoregressive:
+                        batch_y = batch_y[:, -self.args.output_token_len:, :]
+                    if self.args.covariate:
+                        if self.args.last_token:
+                            outputs = outputs[:, -self.args.output_token_len:, -1]
+                            batch_y = batch_y[:, -self.args.output_token_len:, -1]
+                        else:
+                            outputs = outputs[:, :, -1]
+                            batch_y = batch_y[:, :, -1]
+                
                 loss = criterion(outputs, batch_y)
                 if (i + 1) % 100 == 0:
                     if (self.args.ddp and self.args.local_rank == 0) or not self.args.ddp:
@@ -227,6 +240,10 @@ class Exp_Forecast(Exp_Basic):
                         time_now = time.time()
 
                 loss.backward()
+                
+                # Gradient clipping to prevent NaN loss
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                
                 model_optim.step()
 
             if (self.args.ddp and self.args.local_rank == 0) or not self.args.ddp:
