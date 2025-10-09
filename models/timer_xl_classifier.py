@@ -214,11 +214,11 @@ class Model(nn.Module):
         # Pool over variables (C): [B, C, N, output_token_len] -> [B, N, output_token_len]
         dec_out_pooled = dec_out.mean(dim=1)
         
-        # Flatten temporal features: [B, N, output_token_len] -> [B, N * output_token_len]
-        dec_out_flat = dec_out_pooled.reshape(B, N * self.output_token_len)
+        # Pool over temporal tokens (N): [B, N, output_token_len] -> [B, output_token_len]
+        dec_out_final = dec_out_pooled.mean(dim=1)
         
-        # Classify: [B, N * output_token_len] -> [B, n_classes]
-        logits = self.classifier(dec_out_flat)
+        # Classify: [B, output_token_len] -> [B, n_classes]
+        logits = self.classifier(dec_out_final)
         
         if self.output_attention:
             return logits, attns
