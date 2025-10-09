@@ -118,9 +118,25 @@ class PeruRainfallDataset(Dataset):
         self.n_features = self.data_x.shape[-1]
         self.n_samples = len(self.data_x) - self.seq_len
         
+        # Check class distribution
+        class_counts = np.bincount(self.labels.astype(int))
+        n_class_0 = class_counts[0] if len(class_counts) > 0 else 0
+        n_class_1 = class_counts[1] if len(class_counts) > 1 else 0
+        
         print(f"[{self.flag.upper()}] Data loaded: {len(self.data_x)} timesteps, {self.n_features} features")
         print(f"[{self.flag.upper()}] Available samples: {self.n_samples}")
-        print(f"[{self.flag.upper()}] Class distribution: {np.bincount(self.labels.astype(int))}")
+        print(f"[{self.flag.upper()}] Class distribution: No Rain={n_class_0}, Rain={n_class_1}")
+        
+        # Critical: Verify we have both classes
+        if len(class_counts) < 2 or n_class_1 == 0:
+            print(f"⚠️  WARNING: Only one class found in {self.flag} data!")
+            print(f"   This will cause training to fail (NaN loss)")
+            print(f"   Please check:")
+            print(f"   1. Precipitation threshold (currently may be too high)")
+            print(f"   2. ERA5 data quality")
+            print(f"   3. Preprocessing script")
+            if self.flag == 'train':
+                raise ValueError(f"Training data has only one class! Cannot train classifier.")
     
     def __len__(self):
         return self.n_samples // self.internal

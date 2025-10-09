@@ -27,13 +27,18 @@ class ERA5PreprocessorPeru:
     Handles spatial aggregation, feature engineering, and target creation
     """
     
-    def __init__(self, input_dir, output_dir, target_horizon=24, threshold=0.1):
+    def __init__(self, input_dir, output_dir, target_horizon=24, threshold=0.0001):
         """
         Args:
             input_dir: Directory containing raw ERA5 .zip files
             output_dir: Directory to save processed data
             target_horizon: Hours ahead to predict (default: 24)
-            threshold: Precipitation threshold in mm to define "rain" (default: 0.1)
+            threshold: Precipitation threshold in METERS to define "rain" (default: 0.0001 m = 0.1 mm)
+                      ⚠️ IMPORTANT: ERA5 'tp' variable is in METERS, not millimeters!
+                      Common values:
+                        - 0.0001 m = 0.1 mm (light rain threshold)
+                        - 0.001 m = 1.0 mm (moderate rain threshold)
+                        - 0.01 m = 10.0 mm (heavy rain threshold)
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -41,6 +46,10 @@ class ERA5PreprocessorPeru:
         
         self.target_horizon = target_horizon
         self.threshold = threshold
+        
+        # Print threshold for clarity
+        threshold_mm = self.threshold * 1000
+        print(f"💧 Rain threshold set to: {self.threshold:.6f} m = {threshold_mm:.3f} mm")
         
         # Peru regions (approximate boundaries)
         self.regions = {
@@ -507,8 +516,8 @@ def main():
                        help='Comma-separated list of years to process (e.g., 2023,2024)')
     parser.add_argument('--target_horizon', type=int, default=24,
                        help='Hours ahead to predict (default: 24)')
-    parser.add_argument('--threshold', type=float, default=0.1,
-                       help='Precipitation threshold in mm to define rain (default: 0.1)')
+    parser.add_argument('--threshold', type=float, default=0.0001,
+                       help='Precipitation threshold in METERS to define rain (default: 0.0001 m = 0.1 mm). ERA5 tp is in meters!')
     
     args = parser.parse_args()
     
