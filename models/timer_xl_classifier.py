@@ -80,24 +80,24 @@ class Model(nn.Module):
         # Pool temporal dimension and classify
         self.pooling = nn.AdaptiveAvgPool1d(1)  # Pool over time
         
+        # Simpler classifier to reduce instability
         self.classifier = nn.Sequential(
-            nn.Linear(configs.output_token_len, 256),
-            nn.ReLU(),
+            nn.LayerNorm(configs.output_token_len),  # Add normalization for stability
+            nn.Linear(configs.output_token_len, 128),
+            nn.GELU(),  # GELU is more stable than ReLU
             nn.Dropout(configs.dropout),
-            nn.Linear(256, 64),
-            nn.ReLU(),
-            nn.Dropout(configs.dropout),
-            nn.Linear(64, self.n_classes)
+            nn.Linear(128, self.n_classes)
         )
         
         # Initialize classifier weights
         self._init_classifier_weights()
     
     def _init_classifier_weights(self):
-        """Initialize classifier layers with Xavier uniform"""
+        """Initialize classifier layers with small random weights for stability"""
         for module in self.classifier.modules():
             if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
+                # Use smaller initialization to prevent gradient explosion
+                nn.init.normal_(module.weight, mean=0.0, std=0.01)
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
     

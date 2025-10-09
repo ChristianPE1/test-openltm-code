@@ -251,6 +251,9 @@ class Exp_Forecast(Exp_Basic):
                 if torch.isnan(loss) or torch.isinf(loss):
                     if (i + 1) % 50 == 0:  # Only print occasionally
                         print(f"⚠️ Skipping batch {i+1} due to NaN/Inf loss")
+                        # Debug info
+                        print(f"   outputs: min={outputs.min().item():.4f}, max={outputs.max().item():.4f}, "
+                              f"has_nan={torch.isnan(outputs).any().item()}, has_inf={torch.isinf(outputs).any().item()}")
                     continue
                 
                 if (i + 1) % 100 == 0:
