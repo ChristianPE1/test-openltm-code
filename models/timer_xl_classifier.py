@@ -203,19 +203,16 @@ class Model(nn.Module):
         # Project: [B, C * N, output_token_len]
         dec_out = self.head(embed_out)
         
-        # Reshape: [B, C, N * output_token_len]
-        dec_out = dec_out.reshape(B, C, N, -1).reshape(B, C, -1)
-        
-        # Transpose to [B, N * output_token_len, C]
-        dec_out = dec_out.permute(0, 2, 1)
-        
-        # Denormalize (if needed for interpretability)
-        if self.use_norm:
-            dec_out = dec_out * stdev.permute(0, 2, 1) + means.permute(0, 2, 1)
-        
         # ========== CLASSIFICATION ==========
-        # Aggregate over time dimension: [B, C, N * output_token_len] -> [B, C]
-        dec_out_pooled = dec_out.mean(dim=1)  # Mean pooling over time
+        # For classification, we don't need to denormalize or reshape to time series
+        # Work directly with the encoder output embeddings
+        
+        # Reshape: [B, C * N, output_token_len] -> [B, C, N * output_token_len]
+        dec_out = dec_out.reshape(B, C, N * self.output_token_len)
+        
+        # Pool over time tokens: [B, C, N * output_token_len] -> [B, C]
+        # Use mean pooling to aggregate temporal information
+        dec_out_pooled = dec_out.mean(dim=2)
         
         # Classify: [B, C] -> [B, n_classes]
         logits = self.classifier(dec_out_pooled)
