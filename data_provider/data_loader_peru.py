@@ -25,10 +25,13 @@ class PeruRainfallDataset(Dataset):
         scale: Whether to apply standardization
         subset_rand_ratio: Ratio of data to use (for few-shot learning)
         target_horizon: Hours ahead to predict (default: 24)
+        nonautoregressive: Not used for classification (compatibility)
+        test_flag: Not used for classification (compatibility)
     """
     
     def __init__(self, root_path, flag='train', size=None, data_path='peru_rainfall.csv', 
-                 scale=True, subset_rand_ratio=1.0, target_horizon=24):
+                 scale=True, subset_rand_ratio=1.0, target_horizon=24, 
+                 nonautoregressive=False, test_flag=0):
         
         # Configuration
         self.seq_len = size[0]  # Lookback window
@@ -163,11 +166,14 @@ class PeruRainfallMultiRegionDataset(Dataset):
         scale: Whether to apply standardization
         subset_rand_ratio: Ratio of data to use
         n_regions: Number of regions (default: 5)
+        nonautoregressive: Not used for classification (compatibility)
+        test_flag: Not used for classification (compatibility)
     """
     
     def __init__(self, root_path, flag='train', size=None, 
                  data_path='peru_rainfall_multiregion.csv',
-                 scale=True, subset_rand_ratio=1.0, n_regions=5):
+                 scale=True, subset_rand_ratio=1.0, n_regions=5,
+                 nonautoregressive=False, test_flag=0):
         
         self.seq_len = size[0]
         self.input_token_len = size[1]
