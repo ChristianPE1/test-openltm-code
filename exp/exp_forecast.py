@@ -337,29 +337,41 @@ class Exp_Forecast(Exp_Basic):
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float().to(self.device)
+                
+                # Classification: batch_y is class labels [B]
+                if self.args.task_name == 'classification':
+                    batch_y = batch_y.long().to(self.device)
+                else:
+                    batch_y = batch_y.float().to(self.device)
+                    
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
                 
-                inference_steps = self.args.test_pred_len // self.args.output_token_len
-                dis = self.args.test_pred_len - inference_steps * self.args.output_token_len
-                if dis != 0:
-                    inference_steps += 1
-                pred_y = []
-                for j in range(inference_steps):  
-                    if len(pred_y) != 0:
-                        batch_x = torch.cat([batch_x[:, self.args.input_token_len:, :], pred_y[-1]], dim=1)
+                # Classification: Direct inference (no autoregressive)
+                if self.args.task_name == 'classification':
                     outputs = self.model(batch_x, batch_x_mark, batch_y_mark)
-                    pred_y.append(outputs[:, -self.args.output_token_len:, :])
-                pred_y = torch.cat(pred_y, dim=1)
-                if dis != 0:
-                    pred_y = pred_y[:, :-self.args.output_token_len+dis, :]
-                batch_y = batch_y[:, -self.args.test_pred_len:, :].to(self.device)
-                
-                outputs = pred_y.detach().cpu()
-                batch_y = batch_y.detach().cpu()
-                pred = outputs
-                true = batch_y
+                    # outputs: [B, n_classes], batch_y: [B]
+                    pred = outputs.detach().cpu()
+                    true = batch_y.detach().cpu()
+                else:
+                    # Forecasting: Autoregressive inference
+                    inference_steps = self.args.test_pred_len // self.args.output_token_len
+                    dis = self.args.test_pred_len - inference_steps * self.args.output_token_len
+                    if dis != 0:
+                        inference_steps += 1
+                    pred_y = []
+                    for j in range(inference_steps):  
+                        if len(pred_y) != 0:
+                            batch_x = torch.cat([batch_x[:, self.args.input_token_len:, :], pred_y[-1]], dim=1)
+                        outputs = self.model(batch_x, batch_x_mark, batch_y_mark)
+                        pred_y.append(outputs[:, -self.args.output_token_len:, :])
+                    pred_y = torch.cat(pred_y, dim=1)
+                    if dis != 0:
+                        pred_y = pred_y[:, :-self.args.output_token_len+dis, :]
+                    batch_y = batch_y[:, -self.args.test_pred_len:, :].to(self.device)
+                    
+                    pred = pred_y.detach().cpu()
+                    true = batch_y.detach().cpu()
 
                 preds.append(pred)
                 trues.append(true)
@@ -382,15 +394,64 @@ class Exp_Forecast(Exp_Basic):
         trues = torch.cat(trues, dim=0).numpy()
         print('preds shape:', preds.shape)
         print('trues shape:', trues.shape)
-        if self.args.covariate:
-            preds = preds[:, :, -1]
-            trues = trues[:, :, -1]
-        mae, mse, rmse, mape, mspe, smape = metric(preds, trues)
-        print('mse:{}, mae:{}'.format(mse, mae))
-        f = open("result_long_term_forecast.txt", 'a')
-        f.write(setting + "  \n")
-        f.write('mse:{}, mae:{}'.format(mse, mae))
-        f.write('\n')
-        f.write('\n')
-        f.close()
+        
+        # Classification metrics
+        if self.args.task_name == 'classification':
+            from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix, classification_report
+            
+            # Get predicted classes (argmax of logits)
+            pred_classes = np.argmax(preds, axis=1)
+            true_classes = trues
+            
+            # Calculate metrics
+            accuracy = accuracy_score(true_classes, pred_classes)
+            precision, recall, f1, support = precision_recall_fscore_support(true_classes, pred_classes, average='binary')
+            conf_matrix = confusion_matrix(true_classes, pred_classes)
+            
+            print("\n" + "="*80)
+            print("📊 CLASSIFICATION TEST RESULTS")
+            print("="*80)
+            print(f"\n✅ Accuracy: {accuracy*100:.2f}%")
+            print(f"📈 Precision: {precision:.4f}")
+            print(f"📉 Recall: {recall:.4f}")
+            print(f"🎯 F1-Score: {f1:.4f}")
+            
+            print(f"\n🔢 Confusion Matrix:")
+            print(f"                 Predicted")
+            print(f"              No Rain  |  Rain")
+            print(f"Actual  No Rain   {conf_matrix[0,0]:4d}   |  {conf_matrix[0,1]:4d}")
+            print(f"        Rain      {conf_matrix[1,0]:4d}   |  {conf_matrix[1,1]:4d}")
+            
+            print(f"\n📝 Detailed Classification Report:")
+            print(classification_report(true_classes, pred_classes, target_names=['No Rain', 'Rain']))
+            print("="*80 + "\n")
+            
+            # Save results
+            result_file = f"result_classification_{self.args.model_id}.txt"
+            with open(result_file, 'w') as f:
+                f.write(f"Classification Results for: {setting}\n")
+                f.write("="*80 + "\n")
+                f.write(f"Accuracy: {accuracy*100:.2f}%\n")
+                f.write(f"Precision: {precision:.4f}\n")
+                f.write(f"Recall: {recall:.4f}\n")
+                f.write(f"F1-Score: {f1:.4f}\n\n")
+                f.write("Confusion Matrix:\n")
+                f.write(f"{conf_matrix}\n\n")
+                f.write("Classification Report:\n")
+                f.write(classification_report(true_classes, pred_classes, target_names=['No Rain', 'Rain']))
+            
+            print(f"💾 Results saved to: {result_file}")
+        else:
+            # Forecasting metrics
+            if self.args.covariate:
+                preds = preds[:, :, -1]
+                trues = trues[:, :, -1]
+            mae, mse, rmse, mape, mspe, smape = metric(preds, trues)
+            print('mse:{}, mae:{}'.format(mse, mae))
+            f = open("result_long_term_forecast.txt", 'a')
+            f.write(setting + "  \n")
+            f.write('mse:{}, mae:{}'.format(mse, mae))
+            f.write('\n')
+            f.write('\n')
+            f.close()
         return
