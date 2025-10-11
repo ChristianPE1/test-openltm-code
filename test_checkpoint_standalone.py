@@ -67,6 +67,10 @@ def test_checkpoint(checkpoint_path):
             self.label_len = 48
             self.pred_len = 96
             
+            # Timer-XL specific tokens
+            self.input_token_len = 96  # Default, will be extracted
+            self.output_token_len = 96  # Default, will be extracted
+            
             # Model architecture
             self.enc_in = 27
             self.dec_in = 27
@@ -118,6 +122,8 @@ def test_checkpoint(checkpoint_path):
             self.prompt_num = 10
             self.use_norm = 1
             self.cos = True  # Default, will be extracted
+            self.covariate = False  # Whether using covariate variables
+            self.flash_attention = False  # Whether to use flash attention
             
             # Transfer learning
             self.pretrained_weight = './checkpoints/TimerXL_pretrained.pth'
@@ -145,6 +151,10 @@ def test_checkpoint(checkpoint_path):
                 args.d_model = int(part[2:])
             elif part.startswith('dff') and part[2:].isdigit():
                 args.d_ff = int(part[2:])
+            elif part.startswith('it') and part[2:].isdigit():
+                args.input_token_len = int(part[2:])
+            elif part.startswith('ot') and part[2:].isdigit():
+                args.output_token_len = int(part[2:])
             elif part.startswith('cosTrue'):
                 args.cos = True
             elif part.startswith('cosFalse'):
@@ -155,6 +165,8 @@ def test_checkpoint(checkpoint_path):
     
     print(f"🔧 Model Configuration:")
     print(f"   - Sequence Length: {args.seq_len}")
+    print(f"   - Input Token Length: {args.input_token_len}")
+    print(f"   - Output Token Length: {args.output_token_len}")
     print(f"   - Batch Size: {args.batch_size}")
     print(f"   - Learning Rate: {args.learning_rate}")
     print(f"   - Encoder Layers: {args.e_layers}")
