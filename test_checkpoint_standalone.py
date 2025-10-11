@@ -101,6 +101,13 @@ def test_checkpoint(checkpoint_path):
             self.gpu = 0
             self.use_multi_gpu = False
             self.devices = '0'
+            self.device_ids = [0]
+            self.ddp = False  # Distributed Data Parallel
+            self.dp = False  # Data Parallel
+            self.local_rank = 0
+            
+            # Adaptation/Transfer Learning
+            self.adaptation = False
             
             # Classification specific
             self.num_class = 2
@@ -121,17 +128,22 @@ def test_checkpoint(checkpoint_path):
     # Parse settings from directory name
     try:
         for i, part in enumerate(parts):
-            if part.startswith('sl'):
+            if part.startswith('sl') and part[2:].isdigit():
                 args.seq_len = int(part[2:])
-            elif part.startswith('bt'):
+            elif part.startswith('bt') and part[2:].isdigit():
                 args.batch_size = int(part[2:])
             elif part.startswith('lr'):
-                args.learning_rate = float(part[2:].replace('-', '.'))
-            elif part.startswith('el'):
+                # Handle scientific notation: lr1e-05 -> 1e-05
+                lr_str = part[2:]
+                try:
+                    args.learning_rate = float(lr_str)
+                except ValueError:
+                    pass  # Keep default
+            elif part.startswith('el') and part[2:].isdigit():
                 args.e_layers = int(part[2:])
-            elif part.startswith('dm'):
+            elif part.startswith('dm') and part[2:].isdigit():
                 args.d_model = int(part[2:])
-            elif part.startswith('dff'):
+            elif part.startswith('dff') and part[2:].isdigit():
                 args.d_ff = int(part[2:])
             elif part.startswith('cosTrue'):
                 args.cos = True
