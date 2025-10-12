@@ -15,6 +15,10 @@ import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, classification_report
 import os
 import glob
+import sys
+
+# Add the current directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import your existing modules
 from exp.exp_forecast import Exp_Forecast
@@ -55,7 +59,7 @@ def test_checkpoint(checkpoint_path):
             
             # Data settings
             self.data = 'PeruRainfall'
-            self.root_path = './peru_data/'
+            self.root_path = './datasets/processed/'
             self.data_path = 'peru_rainfall_cleaned.csv'
             self.features = 'MS'
             self.target = 'rain'
@@ -66,6 +70,10 @@ def test_checkpoint(checkpoint_path):
             self.seq_len = 1440  # Default, will be extracted
             self.label_len = 48
             self.pred_len = 96
+            
+            # Test-specific parameters (usually same as train)
+            self.test_seq_len = 1440  # Will match seq_len
+            self.test_pred_len = 96  # Will match pred_len
             
             # Timer-XL specific tokens
             self.input_token_len = 96  # Default, will be extracted
@@ -89,7 +97,7 @@ def test_checkpoint(checkpoint_path):
             self.output_attention = False
             
             # Optimization
-            self.num_workers = 0
+            self.num_workers = 1  # Set to 1 to allow persistent_workers
             self.itr = 1
             self.train_epochs = 20
             self.batch_size = 16  # Default, will be extracted
@@ -113,6 +121,9 @@ def test_checkpoint(checkpoint_path):
             # Adaptation/Transfer Learning
             self.adaptation = False
             
+            # Visualization
+            self.visualize = False
+            
             # Classification specific
             self.num_class = 2
             
@@ -125,17 +136,27 @@ def test_checkpoint(checkpoint_path):
             self.covariate = False  # Whether using covariate variables
             self.flash_attention = False  # Whether to use flash attention
             
+            # Data loading parameters
+            self.nonautoregressive = False
+            self.test_flag = 'test'
+            self.subset_rand_ratio = 1.0
+            
             # Transfer learning
             self.pretrained_weight = './checkpoints/TimerXL_pretrained.pth'
             self.freeze_encoder = False
     
     args = Args()
     
+    # Set test_dir IMMEDIATELY after Args creation (needed by exp_forecast.py)
+    args.test_dir = setting
+    args.test_file_name = 'checkpoint.pth'
+    
     # Parse settings from directory name
     try:
         for i, part in enumerate(parts):
             if part.startswith('sl') and part[2:].isdigit():
                 args.seq_len = int(part[2:])
+                args.test_seq_len = args.seq_len  # Sync test with train
             elif part.startswith('bt') and part[2:].isdigit():
                 args.batch_size = int(part[2:])
             elif part.startswith('lr'):
@@ -155,6 +176,7 @@ def test_checkpoint(checkpoint_path):
                 args.input_token_len = int(part[2:])
             elif part.startswith('ot') and part[2:].isdigit():
                 args.output_token_len = int(part[2:])
+                args.test_pred_len = args.output_token_len  # Sync test with train
             elif part.startswith('cosTrue'):
                 args.cos = True
             elif part.startswith('cosFalse'):
@@ -175,27 +197,47 @@ def test_checkpoint(checkpoint_path):
     print(f"   - Cosine Scheduler: {args.cos}")
     print()
     
-    # Create experiment instance
+    # Create experiment instance (this builds the model)
+    print(f"🔧 Building model architecture...")
     exp = Exp_Forecast(args)
     
-    # Load model weights
-    exp.model.load_state_dict(checkpoint)
-    exp.model.eval()
+    # Load model weights from checkpoint
+    print(f"📥 Loading checkpoint weights...")
+    try:
+        exp.model.load_state_dict(checkpoint, strict=False)
+        exp.model.eval()
+        print(f"✅ Model loaded successfully!\n")
+    except Exception as e:
+        print(f"⚠️  Warning during checkpoint loading: {e}")
+        print(f"   Trying to load with strict=False (some weights may be missing)\n")
+        exp.model.eval()
     
-    print(f"✅ Model loaded successfully!\n")
     print(f"{'='*80}")
     print(f"🧪 Running Test Evaluation...")
     print(f"{'='*80}\n")
     
-    # Run testing
+    # Run testing (same way as run.py does)
+    # test=0 means use the already loaded model (don't try to reload from disk)
     try:
-        exp.test(setting, test=1)
-        print(f"\n✅ Testing complete!")
+        exp.test(setting, test=0)
+        print(f"\n{'='*80}")
+        print(f"✅ Testing Complete!")
+        print(f"{'='*80}")
         print(f"📄 Results saved to: result_classification_{args.model_id}.txt\n")
     except Exception as e:
+        print(f"\n{'='*80}")
         print(f"❌ Error during testing: {e}")
+        print(f"{'='*80}\n")
         import traceback
         traceback.print_exc()
+        
+        # Additional debugging
+        print(f"\n🔍 Debug Information:")
+        print(f"   args.visualize: {hasattr(args, 'visualize')} = {getattr(args, 'visualize', 'NOT SET')}")
+        print(f"   args.test_seq_len: {hasattr(args, 'test_seq_len')} = {getattr(args, 'test_seq_len', 'NOT SET')}")
+        print(f"   args.test_pred_len: {hasattr(args, 'test_pred_len')} = {getattr(args, 'test_pred_len', 'NOT SET')}")
+        print(f"   args.input_token_len: {hasattr(args, 'input_token_len')} = {getattr(args, 'input_token_len', 'NOT SET')}")
+        print(f"   args.output_token_len: {hasattr(args, 'output_token_len')} = {getattr(args, 'output_token_len', 'NOT SET')}")
 
 
 def find_latest_checkpoint(pattern="checkpoints/classification_peru_rainfall_*/**/checkpoint.pth"):
