@@ -12,6 +12,7 @@ from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
+from utils.tools import FocalLoss  # Import FocalLoss for classification
 
 warnings.filterwarnings('ignore')
 
@@ -84,9 +85,10 @@ class Exp_Forecast(Exp_Basic):
         # Classification loss for rainfall prediction
         if self.args.model == 'timer_xl_classifier':
             if hasattr(self.args, 'use_focal_loss') and self.args.use_focal_loss:
-                # Focal Loss for imbalanced classification
-                from utils.tools import FocalLoss
-                criterion = FocalLoss(alpha=0.25, gamma=2.0)
+                self.criterion = FocalLoss(
+                    alpha=self.args.focal_alpha,
+                    gamma=self.args.focal_gamma
+                )
             elif hasattr(self.args, 'class_weights'):
                 # Weighted CrossEntropy
                 weights = torch.tensor(self.args.class_weights).to(self.device)

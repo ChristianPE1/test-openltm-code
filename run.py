@@ -73,7 +73,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', type=int, default=2, help='number of classes for classification')
     parser.add_argument('--use_focal_loss', action='store_true', help='use focal loss for imbalanced classification', default=False)
     parser.add_argument('--class_weights', type=str, default=None, help='class weights for CrossEntropyLoss (e.g., "0.3,0.7")')
-    
+    parser.add_argument('--focal_alpha', type=float, default=0.66)
+    parser.add_argument('--focal_gamma', type=float, default=2.5)
+
     # GPU
     parser.add_argument('--gpu', type=int, default=0, help='gpu')
     parser.add_argument('--ddp', action='store_true', help='Distributed Data Parallel', default=False)

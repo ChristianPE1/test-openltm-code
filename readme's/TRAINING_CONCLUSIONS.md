@@ -1,24 +1,46 @@
 # 📊 Training Results Analysis & Conclusions
 
-**Date**: 2025-01-11  
-**Dataset**: ERA5 2020-2024 (5 years, 27 features, ~17,000 samples)  
+**Last Updated**: 2025-10-14  
+**Dataset Evolution**: 
+- 5 years (2020-2024): Initial experiments
+- 11 years (2014-2024): Current experiments with 28,119 timesteps
+
 **Task**: Binary rainfall classification (Rain vs No Rain)
 
 ---
 
-## 🏆 Final Model Comparison
+## 🏆 Model Comparison: 5 Years vs 11 Years Dataset
 
-| Metric | Small Model (4L, 512D) | Transfer Learning (8L, 1024D) | Big Model Scratch (8L, 1024D) |
-|--------|------------------------|-------------------------------|-------------------------------|
+### 5 Years Dataset (2020-2024) - COMPLETED ✅
+
+| Metric | Small Model (4L, 512D) | Transfer Learning (8L, 1024D) | Big Model Scratch |
+|--------|------------------------|-------------------------------|-------------------|
 | **Accuracy** | **76.93%** ✅ | **72.87%** | 57.98% ⚠️ |
-| **Precision** | **0.87** ✅ | **0.71** | - (incomplete) |
-| **Recall** | **0.70** | **0.89** ✅ | - (incomplete) |
-| **F1-Score** | **0.78** | **0.79** ✅ | - (incomplete) |
-| **Training Time** | **15 min** ✅ | **60 min** (5 epochs) | 40 min (stopped) |
-| **VRAM Usage** | **1.5 GB** ✅ | ~8 GB | ~6 GB |
-| **Status** | ✅ Complete | ✅ Complete (manually stopped) | ⚠️ Failed (needs more epochs) |
+| **Precision** | **0.87** ✅ | **0.71** | - |
+| **Recall** | **0.70** | **0.89** ✅ | - |
+| **F1-Score** | **0.78** | **0.79** ✅ | - |
+| **Training Time** | **15 min** ✅ | **60 min** (5 epochs) | Incomplete |
+| **VRAM Usage** | **1.5 GB** ✅ | ~6 GB | ~6 GB |
 
-### 🎯 **CONCLUSIÓN CLAVE**: Transfer Learning tiene **MEJOR F1-Score (0.79 vs 0.78)** pero con trade-offs importantes
+### 11 Years Dataset (2014-2024) - IN PROGRESS ⏳
+
+| Metric | Small Efficient (5L, 640D) | Transfer Learning V1 (8L, 1024D) |
+|--------|----------------------------|----------------------------------|
+| **Accuracy** | **69.35%** | 63.34% ❌ |
+| **Precision** | **0.8127** ✅ | 0.6334 |
+| **Recall** | **0.6707** | 1.0000 (colapso) ❌ |
+| **F1-Score** | **0.7349** | 0.7756 (falso) |
+| **F1-Score (Macro)** | **0.69** | **0.39** ❌ |
+| **Epochs Trained** | **6** (stopped manually) | 3 (stopped manually) |
+| **Training Time** | 1.5 hours (6 epochs) | 2 hours (3 epochs) |
+| **VRAM Usage** | **5 GB** ✅ | 6 GB ✅ |
+| **Convergence** | ✅ Stable | ❌ Collapsed |
+| **Status** | ⏳ **CONTINUE TO 25 EPOCHS** | ❌ Failed (predicts "rain" always) |
+
+### 🎯 **CONCLUSIÓN ACTUALIZADA (14/Oct/2025)**: 
+- **Small Model Efficient ES VIABLE** (F1=0.73 con 6 épocas) ✅
+- **Transfer Learning V1 NO CONVERGE** (colapsa en clase mayoritaria) ❌
+- **Proyección**: Small Model → F1=0.80-0.82 con 25 épocas
 
 ---
 
@@ -131,36 +153,6 @@ Actual  No Rain    988   |   163    → 85.8% correct (No Rain)
 - ❌ Pierde 30% de eventos reales de lluvia
 - ❌ Menor recall (70% vs 89%)
 
-### 🎓 Camino de Tesis Recomendado (F1=0.79, zona intermedia)
-
-```
-┌────────────────────────────────────────────┐
-│ RESULTADO: Transfer Learning F1 = 0.79    │
-│ (Zona intermedia: 0.75 < F1 < 0.80)      │
-└──────────────┬─────────────────────────────┘
-               │
-      ┌────────┴────────┐
-      │                 │
-┌─────▼──────────────────────────┐  ┌─────▼──────────────────────────┐
-│ OPCIÓN A: Mejoras              │  │ OPCIÓN B: Análisis ENSO        │
-│ Arquitectónicas ⭐ RECOMENDADO│  │ + Contexto                     │
-│                                 │  │                                 │
-│ ✅ Aporte al estado del arte   │  │ ✅ Reproducible y robusto      │
-│ ⚠️ Riesgo medio (3-4 semanas)  │  │ ⚠️ Contribución moderada       │
-│                                 │  │                                 │
-│ Experiments:                    │  │ Experiments:                    │
-│ - Optimizar Transfer Learning   │  │ - Etiquetar fases ENSO          │
-│ - Modificar TimeAttention       │  │ - 5 longitudes de contexto      │
-│ - Ajustar máscara Kronecker     │  │ - 3 fases ENSO                  │
-│ - Saturation analysis           │  │ - Ablation studies              │
-│                                 │  │                                 │
-│ Contribution:                   │  │ Contribution:                   │
-│ "Optimal context length for     │  │ "Enhanced Timer-XL for         │
-│  ENSO-influenced prediction"    │  │  climate prediction"            │
-└─────────────────────────────────┘  └─────────────────────────────────┘
-```
-
----
 
 ## 🌊 ENSO Phase Analysis Strategy
 
@@ -324,40 +316,6 @@ Based on F1-Score:
 # Validate: F1 > 0.70 for all phases
 ```
 
----
-
-## 📊 Visualization Preview (for Thesis)
-
-### Figure 1: Model Comparison
-```
-Accuracy  ████████████████████ 76.93% (Small)
-          ████████████████████ 76.23% (Transfer)
-          ████████████ 57.98% (Big Scratch)
-
-F1-Score  ████████████████ 0.78 (Small)
-          ████████████████ 0.75-0.80? (Transfer)
-          ████████ 0.55? (Big Scratch)
-```
-
-### Figure 2: ENSO Phase Performance (Hypothesis)
-```
-F1-Score by ENSO Phase:
-El Niño:  ████████████████ 0.75
-La Niña:  ████████████████ 0.76
-Neutral:  ████████████████████ 0.80
-```
-
-### Figure 3: Context Length (Expected)
-```
-F1-Score vs Context Length:
-0.80 |              ┌───────────── Saturation
-     |           ┌──┘
-0.75 |        ┌──┘
-0.70 |   ┌────┘
-     |───┘
-     └────────────────────────────
-      90  180  365  730  1095 days
-```
 
 ---
 
