@@ -85,9 +85,9 @@ class Exp_Forecast(Exp_Basic):
         # Classification loss for rainfall prediction
         if self.args.model == 'timer_xl_classifier':
             if hasattr(self.args, 'use_focal_loss') and self.args.use_focal_loss:
-                self.criterion = FocalLoss(
-                    alpha=self.args.focal_alpha,
-                    gamma=self.args.focal_gamma
+                criterion = FocalLoss(
+                    alpha=self.args.focal_alpha if hasattr(self.args, 'focal_alpha') else 0.66,
+                    gamma=self.args.focal_gamma if hasattr(self.args, 'focal_gamma') else 2.5
                 )
             elif hasattr(self.args, 'class_weights'):
                 # Weighted CrossEntropy
