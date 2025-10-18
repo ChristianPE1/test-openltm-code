@@ -75,20 +75,41 @@ class PeruRainfallDataset(Dataset):
             if 'region' in df_raw.columns:
                 df_raw = df_raw.drop('region', axis=1)
             
-            # Target column (binary: 0=No Rain, 1=Rain)
-            if 'rain_24h' in df_raw.columns:
+            # Detect target column (supports classification AND regression)
+            # CLASIFICACIÓN: 'rain_24h' (binary: 0/1)
+            # REGRESIÓN: 'target_precip_24h' (continuous: mm)
+            if 'target_precip_24h' in df_raw.columns:
+                # REGRESIÓN MODE
+                target_col = 'target_precip_24h'
+                self.is_regression = True
+            elif 'rain_24h' in df_raw.columns:
+                # CLASIFICACIÓN MODE
                 target_col = 'rain_24h'
+                self.is_regression = False
             elif 'rain_tomorrow' in df_raw.columns:
+                # CLASIFICACIÓN MODE (legacy)
                 target_col = 'rain_tomorrow'
+                self.is_regression = False
             else:
-                raise ValueError("Target column 'rain_24h' or 'rain_tomorrow' not found")
+                raise ValueError(
+                    "Target column not found. Expected one of:\n"
+                    "  - 'target_precip_24h' (for regression)\n"
+                    "  - 'rain_24h' (for classification)\n"
+                    "  - 'rain_tomorrow' (for classification, legacy)"
+                )
             
             # Features (all except target)
-            feature_cols = [col for col in df_raw.columns if col not in [target_col, 'precipitation']]
+            feature_cols = [col for col in df_raw.columns if col not in [target_col, 'precipitation', 'total_precipitation']]
             
             # Separate features and labels
             features = df_raw[feature_cols].values
             labels = df_raw[target_col].values
+            
+            print(f"📊 Dataset loaded:")
+            print(f"   Mode: {'REGRESSION' if self.is_regression else 'CLASSIFICATION'}")
+            print(f"   Target: {target_col}")
+            print(f"   Features: {len(feature_cols)}")
+            print(f"   Samples: {len(labels)}")
             
         else:
             raise ValueError(f'Unsupported file format: {dataset_file_path}')
