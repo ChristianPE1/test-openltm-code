@@ -224,6 +224,9 @@ class ERA5RegressionPreprocessor:
         Create CONTINUOUS target: total precipitation in next 24 hours (MM)
         
         NO binarization - preserves actual mm values
+        
+        ⚠️ CRITICAL: ERA5 'tp' is ACCUMULATED precipitation
+        For 24h forecast, we need: precip(t+24h) - precip(t)
         """
         print("\n[4/6] Creating CONTINUOUS target variable...")
         
@@ -235,14 +238,21 @@ class ERA5RegressionPreprocessor:
                 continue
             
             precip = features['total_precipitation']  # Already in MM
-            horizon_steps = self.target_horizon // 12  # 12-hourly resolution
+            horizon_steps = self.target_horizon // 12  # 12-hourly resolution (24h = 2 steps)
             
-            # Target: precipitation accumulated in next 24h
-            # For 12h data, this means sum of next 2 timesteps
-            target_24h = np.concatenate([
-                precip[horizon_steps:],
-                np.full(horizon_steps, np.nan)
-            ])
+            # ⚠️ CRITICAL FIX: ERA5 'tp' is ACCUMULATED
+            # Target = difference between t+24h and t (accumulated precip in 24h window)
+            # For 12-hourly data: target_24h[t] = precip[t+2] - precip[t]
+            
+            # Method: Calculate 24h accumulated precipitation
+            # For each timestep t, we want total precip from t to t+24h
+            target_24h = np.full(len(precip), np.nan)
+            
+            for i in range(len(precip) - horizon_steps):
+                # Sum of precipitation in next horizon_steps (24h)
+                # Since data is 12-hourly accumulated, we sum next 2 values
+                window_precip = precip[i:i+horizon_steps]
+                target_24h[i] = np.sum(window_precip)
             
             targets[region_name] = target_24h
             
@@ -250,14 +260,21 @@ class ERA5RegressionPreprocessor:
             valid_target = target_24h[~np.isnan(target_24h)]
             n_samples = len(valid_target)
             mean_precip = np.mean(valid_target)
+            median_precip = np.median(valid_target)
             max_precip = np.max(valid_target)
+            min_precip = np.min(valid_target)
             rainy_days = np.sum(valid_target > 0.1)  # >0.1mm considered rain
+            heavy_rain = np.sum(valid_target > 10.0)  # >10mm heavy rain
+            extreme_rain = np.sum(valid_target > 50.0)  # >50mm extreme
             
             print(f"  📊 {region_name}:")
             print(f"     Samples: {n_samples}")
             print(f"     Mean: {mean_precip:.3f} mm/24h")
-            print(f"     Max: {max_precip:.3f} mm/24h")
+            print(f"     Median: {median_precip:.3f} mm/24h")
+            print(f"     Range: [{min_precip:.3f}, {max_precip:.3f}] mm")
             print(f"     Rainy days (>0.1mm): {rainy_days} ({100*rainy_days/n_samples:.1f}%)")
+            print(f"     Heavy rain (>10mm): {heavy_rain} ({100*heavy_rain/n_samples:.2f}%)")
+            print(f"     Extreme rain (>50mm): {extreme_rain} ({100*extreme_rain/n_samples:.2f}%)")
         
         print(f"\n✅ CONTINUOUS target created (NO binarization)")
         return targets

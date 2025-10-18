@@ -166,7 +166,7 @@ class PeruRainfallDataset(Dataset):
         """
         Returns:
             seq_x: Input sequence [seq_len, n_features]
-            label: Binary target (0 or 1)
+            label/seq_y: Target (binary label OR continuous sequence depending on mode)
         """
         # Adjust index for few-shot learning
         index = index * self.internal
@@ -179,15 +179,27 @@ class PeruRainfallDataset(Dataset):
         seq_x = self.data_x[s_begin:s_end, :]
         seq_x = torch.tensor(seq_x, dtype=torch.float32)
         
-        # Target (label at the end of sequence)
-        label = self.labels[s_end - 1]
-        label = torch.tensor(label, dtype=torch.long)
-        
-        # Return dummy seq_x_mark and seq_y_mark for compatibility
-        seq_x_mark = torch.zeros((self.seq_len, 1))
-        seq_y_mark = torch.zeros((1, 1))
-        
-        return seq_x, label, seq_x_mark, seq_y_mark
+        if self.is_regression:
+            # REGRESSION MODE: Return sequence of continuous values
+            # Shape: [seq_len, 1] for compatibility with Timer-XL
+            seq_y = self.labels[s_begin:s_end]
+            seq_y = torch.tensor(seq_y, dtype=torch.float32).unsqueeze(-1)  # [seq_len, 1]
+            
+            # Return dummy marks for compatibility
+            seq_x_mark = torch.zeros((self.seq_len, 1))
+            seq_y_mark = torch.zeros((self.seq_len, 1))
+            
+            return seq_x, seq_y, seq_x_mark, seq_y_mark
+        else:
+            # CLASSIFICATION MODE: Return binary label
+            label = self.labels[s_end - 1]
+            label = torch.tensor(label, dtype=torch.long)
+            
+            # Return dummy seq_x_mark and seq_y_mark for compatibility
+            seq_x_mark = torch.zeros((self.seq_len, 1))
+            seq_y_mark = torch.zeros((1, 1))
+            
+            return seq_x, label, seq_x_mark, seq_y_mark
 
 
 class PeruRainfallMultiRegionDataset(Dataset):
